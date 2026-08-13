@@ -31,6 +31,11 @@ export default function Hero() {
                 priority
                 sizes="100vw"
                 className="
+                    absolute
+                    inset-0
+                    z-0
+                    h-full
+                    w-full
                     object-cover
                     object-center
                 "
@@ -46,7 +51,7 @@ export default function Hero() {
                     absolute
                     inset-0
                     z-10
-                    bg-black/50
+                    bg-black/30
                 "
             />
 
@@ -61,9 +66,9 @@ export default function Hero() {
                     inset-0
                     z-10
                     bg-gradient-to-r
-                    from-slate-950/95
-                    via-slate-900/70
-                    to-blue-950/40
+                    from-slate-950/80
+                    via-slate-900/45
+                    to-slate-900/20
                 "
             />
 
