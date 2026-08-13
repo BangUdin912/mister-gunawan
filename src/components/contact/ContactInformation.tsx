@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-
 import { motion } from "framer-motion";
 
 import {
@@ -19,7 +17,6 @@ import {
 } from "lucide-react";
 
 import { settingService } from "@/lib/settingService";
-
 import type { Setting } from "@/types/setting";
 
 interface ContactInformationItem {
@@ -32,20 +29,30 @@ interface ContactInformationItem {
 
 /**
  * =========================================================
+ * DEFAULT CONTACT
+ * =========================================================
+ */
+
+const DEFAULT_CONTACT = {
+    whatsapp: "+62 877-7610-5547",
+    email: "",
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+    youtube: "",
+    address:
+        "Melayani kebutuhan training di seluruh Indonesia.",
+    google_maps: "",
+};
+
+/**
+ * =========================================================
  * HELPERS
  * =========================================================
  */
 
-/**
- * Mengubah nomor WhatsApp menjadi format wa.me
- *
- * Contoh:
- * +62 877-7610-5547
- * =>
- * https://wa.me/6287776105547
- */
 function getWhatsAppUrl(
-    value: string | null | undefined
+    value?: string | null
 ): string | undefined {
     if (!value?.trim()) {
         return undefined;
@@ -57,10 +64,6 @@ function getWhatsAppUrl(
         return undefined;
     }
 
-    /**
-     * Jika nomor dimulai dengan 0,
-     * ubah menjadi 62.
-     */
     const normalizedNumber =
         number.startsWith("0")
             ? `62${number.slice(1)}`
@@ -71,88 +74,75 @@ function getWhatsAppUrl(
     return `https://wa.me/${normalizedNumber}`;
 }
 
-/**
- * Mengubah username / URL Instagram
- * menjadi URL lengkap.
- *
- * @mistergunawan
- * =>
- * https://instagram.com/mistergunawan
- */
+function getSocialUrl(
+    value: string | null | undefined,
+    domain: string
+): string | undefined {
+    if (!value?.trim()) {
+        return undefined;
+    }
+
+    const trimmed = value.trim();
+
+    if (
+        trimmed.startsWith("http://") ||
+        trimmed.startsWith("https://")
+    ) {
+        return trimmed;
+    }
+
+    const escapedDomain = domain.replace(
+        /\./g,
+        "\\."
+    );
+
+    const username = trimmed
+        .replace(/^@/, "")
+        .replace(
+            new RegExp(
+                `^${escapedDomain}/`,
+                "i"
+            ),
+            ""
+        )
+        .replace(/^\/+/, "");
+
+    if (!username) {
+        return undefined;
+    }
+
+    return `https://${domain}/${username}`;
+}
+
 function getInstagramUrl(
-    value: string | null | undefined
+    value?: string | null
 ): string | undefined {
-    if (!value?.trim()) {
-        return undefined;
-    }
-
-    const trimmed = value.trim();
-
-    if (
-        trimmed.startsWith("http://") ||
-        trimmed.startsWith("https://")
-    ) {
-        return trimmed;
-    }
-
-    const username = trimmed.replace(/^@/, "");
-
-    return `https://instagram.com/${username}`;
+    return getSocialUrl(
+        value,
+        "instagram.com"
+    );
 }
 
-/**
- * Facebook
- */
 function getFacebookUrl(
-    value: string | null | undefined
+    value?: string | null
 ): string | undefined {
-    if (!value?.trim()) {
-        return undefined;
-    }
-
-    const trimmed = value.trim();
-
-    if (
-        trimmed.startsWith("http://") ||
-        trimmed.startsWith("https://")
-    ) {
-        return trimmed;
-    }
-
-    return `https://facebook.com/${trimmed
-        .replace(/^\/+/, "")
-        .replace(/^facebook\.com\//i, "")}`;
+    return getSocialUrl(
+        value,
+        "facebook.com"
+    );
 }
 
-/**
- * LinkedIn
- */
 function getLinkedinUrl(
-    value: string | null | undefined
+    value?: string | null
 ): string | undefined {
-    if (!value?.trim()) {
-        return undefined;
-    }
-
-    const trimmed = value.trim();
-
-    if (
-        trimmed.startsWith("http://") ||
-        trimmed.startsWith("https://")
-    ) {
-        return trimmed;
-    }
-
-    return `https://linkedin.com/${trimmed
-        .replace(/^\/+/, "")
-        .replace(/^linkedin\.com\//i, "")}`;
+    return getSocialUrl(
+        value,
+        "linkedin.com"
+    );
 }
 
-/**
- * YouTube
- */
 function getYoutubeUrl(
-    value: string | null | undefined
+    value?: string | null
 ): string | undefined {
     if (!value?.trim()) {
         return undefined;
@@ -167,36 +157,19 @@ function getYoutubeUrl(
         return trimmed;
     }
 
-    /**
-     * Jika admin mengisi:
-     * @mistergunawan
-     */
-    if (trimmed.startsWith("@")) {
-        return `https://youtube.com/${trimmed}`;
-    }
-
-    /**
-     * Jika admin hanya mengisi:
-     * youtube.com/@mistergunawan
-     */
     if (
         trimmed.startsWith("youtube.com/")
     ) {
         return `https://${trimmed}`;
     }
 
+    if (trimmed.startsWith("@")) {
+        return `https://youtube.com/${trimmed}`;
+    }
+
     return `https://youtube.com/@${trimmed}`;
 }
 
-/**
- * Google Maps
- *
- * Jika admin memasukkan URL,
- * gunakan URL tersebut.
- *
- * Jika kosong tetapi address tersedia,
- * buat pencarian Google Maps berdasarkan alamat.
- */
 function getGoogleMapsUrl(
     value: string | null | undefined,
     address: string | null | undefined
@@ -215,9 +188,13 @@ function getGoogleMapsUrl(
     }
 
     if (address?.trim()) {
-        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-            address.trim()
-        )}`;
+        return (
+            "https://www.google.com/maps/search/" +
+            "?api=1&query=" +
+            encodeURIComponent(
+                address.trim()
+            )
+        );
     }
 
     return undefined;
@@ -237,24 +214,24 @@ export default function ContactInformation() {
         useState(true);
 
     const [error, setError] =
-        useState<string | null>(null);
+        useState(false);
 
     /**
      * =======================================================
-     * LOAD DATA SUPABASE
+     * LOAD PUBLIC SETTINGS
      * =======================================================
      */
 
     useEffect(() => {
         let mounted = true;
 
-        async function loadContactInformation() {
+        async function loadSettings() {
             try {
                 setLoading(true);
-                setError(null);
+                setError(false);
 
                 const data =
-                    await settingService.get();
+                    await settingService.getPublic();
 
                 if (!mounted) {
                     return;
@@ -263,7 +240,7 @@ export default function ContactInformation() {
                 setSetting(data);
             } catch (error) {
                 console.error(
-                    "Load Contact Information error:",
+                    "Load public settings error:",
                     error
                 );
 
@@ -271,11 +248,8 @@ export default function ContactInformation() {
                     return;
                 }
 
-                setError(
-                    error instanceof Error
-                        ? error.message
-                        : "Gagal memuat informasi kontak."
-                );
+                setSetting(null);
+                setError(true);
             } finally {
                 if (mounted) {
                     setLoading(false);
@@ -283,7 +257,7 @@ export default function ContactInformation() {
             }
         }
 
-        loadContactInformation();
+        loadSettings();
 
         return () => {
             mounted = false;
@@ -292,160 +266,134 @@ export default function ContactInformation() {
 
     /**
      * =======================================================
-     * LOADING
+     * MERGE SETTINGS
      * =======================================================
      */
 
-    if (loading) {
-        return (
-            <div className="flex min-h-64 items-center justify-center">
-                <div className="flex items-center gap-3 text-sm text-slate-500">
-                    <Loader2 className="h-5 w-5 animate-spin" />
+    const whatsapp =
+        setting?.whatsapp?.trim() ||
+        DEFAULT_CONTACT.whatsapp;
 
-                    Memuat informasi kontak...
-                </div>
-            </div>
-        );
-    }
+    const email =
+        setting?.email?.trim() ||
+        DEFAULT_CONTACT.email;
 
-    /**
-     * =======================================================
-     * ERROR
-     * =======================================================
-     */
+    const instagram =
+        setting?.instagram?.trim() ||
+        DEFAULT_CONTACT.instagram;
 
-    if (error) {
-        return (
-            <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
-                Gagal memuat informasi kontak.
-            </div>
-        );
-    }
+    const facebook =
+        setting?.facebook?.trim() ||
+        DEFAULT_CONTACT.facebook;
 
-    /**
-     * Jika data settings belum tersedia.
-     */
-    if (!setting) {
-        return (
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-                Informasi kontak belum tersedia.
-            </div>
-        );
-    }
+    const linkedin =
+        setting?.linkedin?.trim() ||
+        DEFAULT_CONTACT.linkedin;
+
+    const youtube =
+        setting?.youtube?.trim() ||
+        DEFAULT_CONTACT.youtube;
+
+    const address =
+        setting?.address?.trim() ||
+        DEFAULT_CONTACT.address;
+
+    const googleMaps =
+        setting?.google_maps?.trim() ||
+        DEFAULT_CONTACT.google_maps;
 
     /**
      * =======================================================
-     * BUILD CONTACT INFORMATION
+     * BUILD INFORMATION
      * =======================================================
      */
 
     const informations: ContactInformationItem[] = [];
 
-    /**
-     * WhatsApp
-     */
-    if (setting.whatsapp?.trim()) {
+    if (whatsapp) {
         informations.push({
             icon: MessageCircle,
             title: "WhatsApp",
-            value: setting.whatsapp,
+            value: whatsapp,
             href: getWhatsAppUrl(
-                setting.whatsapp
+                whatsapp
             ),
             description:
                 "Hubungi kami untuk konsultasi training, seminar, workshop, coaching, maupun pengembangan SDM.",
         });
     }
 
-    /**
-     * Email
-     */
-    if (setting.email?.trim()) {
+    if (email) {
         informations.push({
             icon: Mail,
             title: "Email",
-            value: setting.email,
-            href: `mailto:${setting.email.trim()}`,
+            value: email,
+            href: `mailto:${email}`,
             description:
                 "Kirim pertanyaan, permintaan penawaran, atau kebutuhan pelatihan perusahaan.",
         });
     }
 
-    /**
-     * Instagram
-     */
-    if (setting.instagram?.trim()) {
+    if (instagram) {
         informations.push({
             icon: Instagram,
             title: "Instagram",
-            value: setting.instagram,
+            value: instagram,
             href: getInstagramUrl(
-                setting.instagram
+                instagram
             ),
             description:
                 "Ikuti aktivitas training, seminar, motivasi, dan konten edukasi terbaru.",
         });
     }
 
-    /**
-     * Facebook
-     */
-    if (setting.facebook?.trim()) {
+    if (facebook) {
         informations.push({
             icon: Facebook,
             title: "Facebook",
-            value: setting.facebook,
+            value: facebook,
             href: getFacebookUrl(
-                setting.facebook
+                facebook
             ),
             description:
                 "Lihat dokumentasi kegiatan training dan informasi terbaru melalui Facebook.",
         });
     }
 
-    /**
-     * LinkedIn
-     */
-    if (setting.linkedin?.trim()) {
+    if (linkedin) {
         informations.push({
             icon: Linkedin,
             title: "LinkedIn",
-            value: setting.linkedin,
+            value: linkedin,
             href: getLinkedinUrl(
-                setting.linkedin
+                linkedin
             ),
             description:
                 "Terhubung secara profesional dan lihat pengalaman sebagai trainer.",
         });
     }
 
-    /**
-     * YouTube
-     */
-    if (setting.youtube?.trim()) {
+    if (youtube) {
         informations.push({
             icon: Youtube,
             title: "YouTube",
-            value: setting.youtube,
+            value: youtube,
             href: getYoutubeUrl(
-                setting.youtube
+                youtube
             ),
             description:
                 "Tonton video training, motivasi, public speaking, dan pengembangan SDM.",
         });
     }
 
-    /**
-     * Lokasi
-     */
-    if (setting.address?.trim()) {
+    if (address) {
         informations.push({
             icon: MapPin,
             title: "Lokasi",
-            value: setting.address,
+            value: address,
             href: getGoogleMapsUrl(
-                setting.google_maps,
-                setting.address
+                googleMaps,
+                address
             ),
             description:
                 "Melayani training secara offline maupun online di seluruh Indonesia.",
@@ -459,11 +407,8 @@ export default function ContactInformation() {
      */
 
     return (
-        <div className="space-y-10">
-
-            {/* =================================================
-                HEADER
-            ================================================= */}
+        <div className="min-w-0 w-full space-y-10">
+            {/* HEADER */}
 
             <motion.div
                 initial={{
@@ -480,6 +425,7 @@ export default function ContactInformation() {
                 transition={{
                     duration: 0.5,
                 }}
+                className="min-w-0"
             >
                 <span
                     className="
@@ -501,6 +447,7 @@ export default function ContactInformation() {
                 <h2
                     className="
                         mt-5
+                        max-w-full
                         text-4xl
                         font-bold
                         tracking-tight
@@ -527,181 +474,257 @@ export default function ContactInformation() {
                 </p>
             </motion.div>
 
-            {/* =================================================
-                CONTACT LIST
-            ================================================= */}
+            {/* ERROR */}
 
-            {informations.length > 0 ? (
-                <div className="grid gap-6">
-                    {informations.map(
-                        (item, index) => {
-                            const Icon =
-                                item.icon;
-
-                            const card = (
-                                <div
-                                    className={`
-                                        group
-                                        flex
-                                        gap-5
-                                        rounded-3xl
-                                        border
-                                        border-slate-200
-                                        bg-white
-                                        p-6
-                                        shadow-sm
-                                        transition-all
-                                        duration-300
-                                        hover:-translate-y-1
-                                        hover:border-blue-200
-                                        hover:shadow-xl
-                                        ${
-                                            item.href
-                                                ? "cursor-pointer"
-                                                : ""
-                                        }
-                                    `}
-                                >
-                                    {/* Icon */}
-
-                                    <div
-                                        className="
-                                            flex
-                                            h-14
-                                            w-14
-                                            shrink-0
-                                            items-center
-                                            justify-center
-                                            rounded-2xl
-                                            bg-blue-50
-                                            text-blue-600
-                                            transition-all
-                                            duration-300
-                                            group-hover:bg-blue-600
-                                            group-hover:text-white
-                                        "
-                                    >
-                                        <Icon className="h-7 w-7" />
-                                    </div>
-
-                                    {/* Content */}
-
-                                    <div className="min-w-0 flex-1">
-                                        <p
-                                            className="
-                                                text-sm
-                                                font-medium
-                                                text-slate-500
-                                            "
-                                        >
-                                            {
-                                                item.title
-                                            }
-                                        </p>
-
-                                        <h3
-                                            className="
-                                                mt-1
-                                                break-words
-                                                text-lg
-                                                font-semibold
-                                                text-slate-900
-                                            "
-                                        >
-                                            {
-                                                item.value
-                                            }
-                                        </h3>
-
-                                        <p
-                                            className="
-                                                mt-2
-                                                leading-7
-                                                text-slate-600
-                                            "
-                                        >
-                                            {
-                                                item.description
-                                            }
-                                        </p>
-                                    </div>
-
-                                    {/* Arrow */}
-
-                                    {item.href && (
-                                        <ArrowUpRight
-                                            className="
-                                                mt-1
-                                                h-5
-                                                w-5
-                                                shrink-0
-                                                text-slate-400
-                                                transition-all
-                                                duration-300
-                                                group-hover:-translate-y-1
-                                                group-hover:translate-x-1
-                                                group-hover:text-blue-600
-                                            "
-                                        />
-                                    )}
-                                </div>
-                            );
-
-                            return (
-                                <motion.div
-                                    key={`${item.title}-${index}`}
-                                    initial={{
-                                        opacity: 0,
-                                        x: -20,
-                                    }}
-                                    whileInView={{
-                                        opacity: 1,
-                                        x: 0,
-                                    }}
-                                    viewport={{
-                                        once: true,
-                                    }}
-                                    transition={{
-                                        duration: 0.4,
-                                        delay:
-                                            index *
-                                            0.08,
-                                    }}
-                                >
-                                    {item.href ? (
-                                        <Link
-                                            href={
-                                                item.href
-                                            }
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block"
-                                        >
-                                            {card}
-                                        </Link>
-                                    ) : (
-                                        card
-                                    )}
-                                </motion.div>
-                            );
-                        }
-                    )}
-                </div>
-            ) : (
+            {error && (
                 <div
                     className="
-                        rounded-3xl
+                        rounded-2xl
                         border
-                        border-slate-200
-                        bg-white
-                        p-8
-                        text-center
-                        text-slate-500
+                        border-amber-200
+                        bg-amber-50
+                        p-4
+                        text-sm
+                        text-amber-700
                     "
                 >
-                    Informasi kontak belum diatur
-                    oleh administrator.
+                    Data dari server belum dapat dimuat.
+                    Informasi kontak default digunakan.
                 </div>
+            )}
+
+            {/* LOADING */}
+
+            {loading ? (
+                <div
+                    className="
+                        flex
+                        min-h-64
+                        items-center
+                        justify-center
+                    "
+                >
+                    <div
+                        className="
+                            flex
+                            items-center
+                            gap-3
+                            text-sm
+                            text-slate-500
+                        "
+                    >
+                        <Loader2
+                            className="
+                                h-5
+                                w-5
+                                animate-spin
+                            "
+                        />
+
+                        Memuat informasi kontak...
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {informations.length > 0 ? (
+                        <div
+                            className="
+                                grid
+                                min-w-0
+                                w-full
+                                gap-6
+                            "
+                        >
+                            {informations.map(
+                                (
+                                    item,
+                                    index
+                                ) => {
+                                    const Icon =
+                                        item.icon;
+
+                                    const card = (
+                                        <div
+                                            className="
+                                                group
+                                                flex
+                                                min-w-0
+                                                w-full
+                                                gap-4
+                                                overflow-hidden
+                                                rounded-3xl
+                                                border
+                                                border-slate-200
+                                                bg-white
+                                                p-6
+                                                shadow-sm
+                                                transition-all
+                                                duration-300
+                                                hover:-translate-y-1
+                                                hover:border-blue-200
+                                                hover:shadow-xl
+                                            "
+                                        >
+                                            {/* ICON */}
+
+                                            <div
+                                                className="
+                                                    flex
+                                                    h-14
+                                                    w-14
+                                                    shrink-0
+                                                    items-center
+                                                    justify-center
+                                                    rounded-2xl
+                                                    bg-blue-50
+                                                    text-blue-600
+                                                    transition-all
+                                                    duration-300
+                                                    group-hover:bg-blue-600
+                                                    group-hover:text-white
+                                                "
+                                            >
+                                                <Icon
+                                                    className="
+                                                        h-7
+                                                        w-7
+                                                    "
+                                                />
+                                            </div>
+
+                                            {/* CONTENT */}
+
+                                            <div
+                                                className="
+                                                    min-w-0
+                                                    flex-1
+                                                "
+                                            >
+                                                <p
+                                                    className="
+                                                        text-sm
+                                                        font-medium
+                                                        text-slate-500
+                                                    "
+                                                >
+                                                    {
+                                                        item.title
+                                                    }
+                                                </p>
+
+                                                <h3
+                                                    className="
+                                                        mt-1
+                                                        min-w-0
+                                                        break-words
+                                                        [overflow-wrap:anywhere]
+                                                        text-lg
+                                                        font-semibold
+                                                        text-slate-900
+                                                    "
+                                                >
+                                                    {
+                                                        item.value
+                                                    }
+                                                </h3>
+
+                                                <p
+                                                    className="
+                                                        mt-2
+                                                        break-words
+                                                        leading-7
+                                                        text-slate-600
+                                                    "
+                                                >
+                                                    {
+                                                        item.description
+                                                    }
+                                                </p>
+                                            </div>
+
+                                            {/* ARROW */}
+
+                                            {item.href && (
+                                                <ArrowUpRight
+                                                    className="
+                                                        mt-1
+                                                        h-5
+                                                        w-5
+                                                        shrink-0
+                                                        text-slate-400
+                                                        transition-all
+                                                        duration-300
+                                                        group-hover:-translate-y-1
+                                                        group-hover:translate-x-1
+                                                        group-hover:text-blue-600
+                                                    "
+                                                />
+                                            )}
+                                        </div>
+                                    );
+
+                                    return (
+                                        <motion.div
+                                            key={`${item.title}-${index}`}
+                                            className="min-w-0 w-full"
+                                            initial={{
+                                                opacity: 0,
+                                                x: -20,
+                                            }}
+                                            whileInView={{
+                                                opacity: 1,
+                                                x: 0,
+                                            }}
+                                            viewport={{
+                                                once: true,
+                                            }}
+                                            transition={{
+                                                duration: 0.4,
+                                                delay:
+                                                    index *
+                                                    0.08,
+                                            }}
+                                        >
+                                            {item.href ? (
+                                                <a
+                                                    href={
+                                                        item.href
+                                                    }
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="
+                                                        block
+                                                        min-w-0
+                                                        w-full
+                                                    "
+                                                >
+                                                    {card}
+                                                </a>
+                                            ) : (
+                                                card
+                                            )}
+                                        </motion.div>
+                                    );
+                                }
+                            )}
+                        </div>
+                    ) : (
+                        <div
+                            className="
+                                rounded-3xl
+                                border
+                                border-slate-200
+                                bg-white
+                                p-8
+                                text-center
+                                text-slate-500
+                            "
+                        >
+                            Informasi kontak belum
+                            tersedia.
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

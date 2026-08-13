@@ -25,10 +25,6 @@ type StorageFolder =
  * =========================================================
  */
 
-/**
- * Membuat error Supabase lebih mudah dibaca
- * di console dan toast.
- */
 function getSupabaseErrorMessage(
     error: unknown,
     fallback: string
@@ -37,35 +33,26 @@ function getSupabaseErrorMessage(
         error &&
         typeof error === "object"
     ) {
-        const supabaseError =
-            error as {
-                message?: string;
-                details?: string;
-                hint?: string;
-                code?: string;
-                name?: string;
-            };
+        const supabaseError = error as {
+            message?: string;
+            details?: string;
+            hint?: string;
+            code?: string;
+            name?: string;
+        };
 
-        if (
-            supabaseError.message
-        ) {
+        if (supabaseError.message) {
             return supabaseError.message;
         }
     }
 
     if (error instanceof Error) {
-        return (
-            error.message ||
-            fallback
-        );
+        return error.message || fallback;
     }
 
     return fallback;
 }
 
-/**
- * Logging error Supabase secara konsisten.
- */
 function logSupabaseError(
     context: string,
     error: unknown
@@ -74,31 +61,24 @@ function logSupabaseError(
         error &&
         typeof error === "object"
     ) {
-        const supabaseError =
-            error as {
-                message?: string;
-                details?: string;
-                hint?: string;
-                code?: string;
-                name?: string;
-                status?: number;
-            };
+        const supabaseError = error as {
+            message?: string;
+            details?: string;
+            hint?: string;
+            code?: string;
+            name?: string;
+            status?: number;
+        };
 
         console.error(
             `${context}:`,
             {
-                name:
-                    supabaseError.name,
-                message:
-                    supabaseError.message,
-                details:
-                    supabaseError.details,
-                hint:
-                    supabaseError.hint,
-                code:
-                    supabaseError.code,
-                status:
-                    supabaseError.status,
+                name: supabaseError.name,
+                message: supabaseError.message,
+                details: supabaseError.details,
+                hint: supabaseError.hint,
+                code: supabaseError.code,
+                status: supabaseError.status,
             }
         );
 
@@ -147,7 +127,7 @@ function createStoragePath(
 
 /**
  * =========================================================
- * GET STORAGE PATH FROM URL
+ * STORAGE PATH
  * =========================================================
  */
 
@@ -159,8 +139,7 @@ function getStoragePathFromUrl(
     }
 
     try {
-        const parsedUrl =
-            new URL(url);
+        const parsedUrl = new URL(url);
 
         const marker =
             `/storage/v1/object/public/${BUCKET_NAME}/`;
@@ -184,9 +163,7 @@ function getStoragePathFromUrl(
             return null;
         }
 
-        return decodeURIComponent(
-            path
-        );
+        return decodeURIComponent(path);
     } catch {
         return null;
     }
@@ -229,14 +206,10 @@ async function uploadFile(
                 filePath,
                 file,
                 {
-                    cacheControl:
-                        "3600",
-
+                    cacheControl: "3600",
                     upsert: false,
-
                     contentType:
-                        file.type ||
-                        undefined,
+                        file.type || undefined,
                 }
             );
 
@@ -263,9 +236,7 @@ async function uploadFile(
                 filePath
             );
 
-    if (
-        !data?.publicUrl
-    ) {
+    if (!data?.publicUrl) {
         throw new Error(
             "URL file berhasil diupload tetapi tidak dapat dibuat."
         );
@@ -288,10 +259,6 @@ async function deleteStorageFile(
             url
         );
 
-    /**
-     * URL bukan berasal dari bucket
-     * settings → jangan hapus.
-     */
     if (!path) {
         return;
     }
@@ -302,9 +269,7 @@ async function deleteStorageFile(
         } =
             await supabase.storage
                 .from(BUCKET_NAME)
-                .remove([
-                    path,
-                ]);
+                .remove([path]);
 
         if (error) {
             logSupabaseError(
@@ -329,20 +294,57 @@ async function deleteStorageFile(
 export const settingService = {
     /**
      * =====================================================
-     * GET SETTINGS
+     * PUBLIC SETTINGS
      * =====================================================
      *
-     * Hanya membaca settings.
+     * Dipakai oleh:
      *
-     * PENTING:
-     * Method ini TIDAK melakukan INSERT otomatis.
+     * - Home
+     * - Contact
+     * - About
+     * - Footer
+     * - SEO
      *
-     * Jika tabel settings kosong, return null.
+     * Tidak membutuhkan login.
      *
-     * Ini mencegah halaman publik seperti
-     * ContactInformation membuat data settings
-     * secara otomatis.
+     * TIDAK melakukan INSERT.
+     * TIDAK melakukan UPDATE.
+     * Hanya SELECT.
      */
+    async getPublic(): Promise<Setting | null> {
+        const {
+            data,
+            error,
+        } =
+            await supabase
+                .from(TABLE_NAME)
+                .select("*")
+                .limit(1)
+                .maybeSingle();
+
+        if (error) {
+            logSupabaseError(
+                "Supabase get public settings error",
+                error
+            );
+
+            throw new Error(
+                getSupabaseErrorMessage(
+                    error,
+                    "Gagal mengambil pengaturan website."
+                )
+            );
+        }
+
+        return data as Setting | null;
+    },
+
+    /**
+     * =====================================================
+     * ADMIN GET SETTINGS
+     * =====================================================
+     */
+
     async get(): Promise<Setting | null> {
         const {
             data,
@@ -368,37 +370,24 @@ export const settingService = {
             );
         }
 
-        if (!data) {
-            console.warn(
-                "Settings belum tersedia."
-            );
-
-            return null;
-        }
-
-        return data as Setting;
+        return data as Setting | null;
     },
 
     /**
      * =====================================================
      * CREATE SETTINGS
      * =====================================================
-     *
-     * Digunakan hanya ketika memang diperlukan,
-     * misalnya saat setup/admin.
-     *
-     * Tidak dipanggil otomatis oleh ContactInformation.
      */
+
     async create(
         payload: Partial<SettingPayload> = {}
     ): Promise<Setting> {
         const cleanPayload =
             Object.fromEntries(
-                Object.entries(payload)
-                    .filter(
-                        ([, value]) =>
-                            value !== undefined
-                    )
+                Object.entries(payload).filter(
+                    ([, value]) =>
+                        value !== undefined
+                )
             );
 
         const {
@@ -407,9 +396,7 @@ export const settingService = {
         } =
             await supabase
                 .from(TABLE_NAME)
-                .insert(
-                    cleanPayload
-                )
+                .insert(cleanPayload)
                 .select("*")
                 .single();
 
@@ -440,22 +427,8 @@ export const settingService = {
      * =====================================================
      * UPDATE SETTINGS
      * =====================================================
-     *
-     * Digunakan untuk:
-     *
-     * - Email Website
-     * - Phone
-     * - WhatsApp
-     * - Address
-     * - Google Maps
-     * - Social Media
-     * - SEO
-     * - Logo
-     * - Favicon
-     *
-     * Login Email dan Password
-     * TIDAK diproses di sini.
      */
+
     async update(
         id: string,
         payload: SettingPayload
@@ -472,25 +445,17 @@ export const settingService = {
             );
         }
 
-        /**
-         * Hapus undefined.
-         *
-         * null tetap dikirim agar field
-         * dapat dikosongkan di database.
-         */
         const cleanPayload =
             Object.fromEntries(
-                Object.entries(payload)
-                    .filter(
-                        ([, value]) =>
-                            value !== undefined
-                    )
+                Object.entries(payload).filter(
+                    ([, value]) =>
+                        value !== undefined
+                )
             ) as SettingPayload;
 
         if (
-            Object.keys(
-                cleanPayload
-            ).length === 0
+            Object.keys(cleanPayload)
+                .length === 0
         ) {
             throw new Error(
                 "Tidak ada data yang akan diperbarui."
@@ -503,9 +468,7 @@ export const settingService = {
         } =
             await supabase
                 .from(TABLE_NAME)
-                .update(
-                    cleanPayload
-                )
+                .update(cleanPayload)
                 .eq("id", id)
                 .select("*")
                 .single();
@@ -538,25 +501,17 @@ export const settingService = {
      * UPLOAD LOGO
      * =====================================================
      */
+
     async uploadLogo(
         file: File,
         oldLogo?: string | null
     ): Promise<string> {
-        /**
-         * Upload baru terlebih dahulu.
-         *
-         * Jika gagal, logo lama tetap aman.
-         */
         const newUrl =
             await uploadFile(
                 file,
                 "logo"
             );
 
-        /**
-         * Hapus logo lama setelah
-         * upload baru berhasil.
-         */
         if (
             oldLogo &&
             oldLogo !== newUrl
@@ -574,6 +529,7 @@ export const settingService = {
      * UPLOAD FAVICON
      * =====================================================
      */
+
     async uploadFavicon(
         file: File,
         oldFavicon?: string | null
@@ -601,6 +557,7 @@ export const settingService = {
      * UPLOAD SEO IMAGE
      * =====================================================
      */
+
     async uploadSeoImage(
         file: File,
         oldImage?: string | null
@@ -628,6 +585,7 @@ export const settingService = {
      * DELETE FILE
      * =====================================================
      */
+
     async deleteFile(
         url?: string | null
     ): Promise<void> {
