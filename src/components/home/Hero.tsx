@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
     ArrowRight,
@@ -7,9 +8,6 @@ import {
     Star,
 } from "lucide-react";
 import { motion } from "framer-motion";
-
-const HERO_IMAGE =
-    "/images/hero/Hero.jpeg";
 
 export default function Hero() {
     return (
@@ -26,20 +24,16 @@ export default function Hero() {
                 BACKGROUND IMAGE
             ===================================================== */}
 
-            <div
-                aria-hidden="true"
+            <Image
+                src="/images/hero/Hero.jpeg"
+                alt="Mister Gunawan - Hartawan Sukses Sejahtera"
+                fill
+                priority
+                sizes="100vw"
                 className="
-                    absolute
-                    inset-0
-                    z-0
-                    scale-105
-                    bg-cover
-                    bg-center
-                    bg-no-repeat
+                    object-cover
+                    object-center
                 "
-                style={{
-                    backgroundImage: `url("${HERO_IMAGE}")`,
-                }}
             />
 
             {/* =====================================================
@@ -52,7 +46,7 @@ export default function Hero() {
                     absolute
                     inset-0
                     z-10
-                    bg-black/55
+                    bg-black/50
                 "
             />
 
@@ -106,9 +100,7 @@ export default function Hero() {
                         duration: 0.7,
                         ease: "easeOut",
                     }}
-                    className="
-                        max-w-3xl
-                    "
+                    className="max-w-3xl"
                 >
                     {/* =================================================
                         BADGE
@@ -162,7 +154,6 @@ export default function Hero() {
                             leading-tight
                             text-white
                             sm:text-6xl
-                            md:text-6xl
                             lg:text-7xl
                         "
                     >
@@ -243,10 +234,7 @@ export default function Hero() {
                             Konsultasi Gratis
 
                             <ArrowRight
-                                className="
-                                    h-5
-                                    w-5
-                                "
+                                className="h-5 w-5"
                             />
                         </Link>
 
@@ -271,10 +259,7 @@ export default function Hero() {
                             "
                         >
                             <PlayCircle
-                                className="
-                                    h-5
-                                    w-5
-                                "
+                                className="h-5 w-5"
                             />
 
                             Lihat Layanan
@@ -282,12 +267,6 @@ export default function Hero() {
                     </div>
                 </motion.div>
             </div>
-
-            {/* =====================================================
-                BOTTOM FADE
-            ===================================================== */}
-
-
         </section>
     );
 }
