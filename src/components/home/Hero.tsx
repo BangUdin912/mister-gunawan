@@ -9,7 +9,7 @@ import {
 import { motion } from "framer-motion";
 
 const HERO_IMAGE =
-    "/images/hero/hero.jpeg";
+    "/images/hero/Hero.jpeg";
 
 export default function Hero() {
     return (
